@@ -1,4 +1,9 @@
 name: Daily Tweet Digest                      # 工作流名称，可随意
+
+permissions:           # ← 新增这块
+  contents: write      # 允许写代码库
+  id-token: write      #（可选）以后需要 OIDC 时才用到
+
 on:
   schedule:                                   # 定时触发
     - cron:  '0 0 * * *'                      # 每日 00:00 UTC → 08:00 台北
