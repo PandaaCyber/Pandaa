@@ -1,0 +1,32 @@
+name: Daily Tweet Digest                      # 工作流名称，可随意
+on:
+  schedule:                                   # 定时触发
+    - cron:  '0 0 * * *'                      # 每日 00:00 UTC → 08:00 台北
+  workflow_dispatch:                          # 允许手动点按钮触发
+jobs:
+  run:
+    runs-on: ubuntu-latest                    # GitHub 免费 Runner
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4             # 把仓库代码拉到 Runner
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'              # Python 版本
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt  # 安装 feedparser 等三包
+
+      - name: Run fetch & summarize script
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}  # 调你的密钥
+        run: python fetch_and_summarize.py
+
+      - name: Commit generated files
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name  "github-action-bot"
+          git add docs/daily || true
+          git commit -m "chore: update digest $(date -u +'%Y-%m-%d')" || echo "no changes"
+          git push
