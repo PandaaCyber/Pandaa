@@ -1,0 +1,10 @@
+title: My Tweet Digest
+description: 每日 AI / Tech 推文 200 字速览
+remote_theme: pages-themes/cayman@v0.2.0   # 🌈 官方简洁卡片主题，可换其它
+plugins:
+  - jekyll-feed                             # 生成 RSS（可选）
+sass:
+  style: compressed                         # 压缩 CSS
+markdown: kramdown
+highlighter: rouge
+baseurl: ""                                 # 根目录
