@@ -8,3 +8,5 @@ sass:
 markdown: kramdown
 highlighter: rouge
 baseurl: ""                                 # 根目录
+include:
+  - assets/css
