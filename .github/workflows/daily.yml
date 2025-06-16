@@ -19,7 +19,6 @@ jobs:
       with:
         python-version: '3.11'
 
-    # 只需 feedparser/markdownify/openai，snscrape 不再安装
     - name: Install dependencies
       run: |
         pip install --upgrade pip
@@ -37,5 +36,3 @@ jobs:
         git add -A docs/daily
         git commit -m "chore: refresh digest $(date -u '+%Y-%m-%d %H:%M')" || echo "nothing to commit"
         git push
-
-
