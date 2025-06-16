@@ -79,9 +79,9 @@ def main() -> None:
                 f.write(f"[原推文链接]({entry.link})\n")
                 f.write("\n</div>\n\n")
 
-    print(f"已生成：{outfile.relative_to(pathlib.Path.cwd())}")
+    # 打印相对路径即可，避免 relative_to 冲突
+    print(f"已生成：{outfile}")
 
 
 if __name__ == "__main__":
     main()
-
