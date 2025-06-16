@@ -1,3 +1,4 @@
 feedparser
 markdownify
 openai
+snscrape[twitter]     # ← 新增：零 API 抓推文
