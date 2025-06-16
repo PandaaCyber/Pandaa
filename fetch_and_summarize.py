@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-抓取 TwitRSS.me → ChatGPT 摘要 → docs/daily/YYYY-MM-DD.md
-供 GitHub Pages 渲染，无需任何 Twitter API / snscrape。
+抓取 Nitter RSS (多节点轮询) → ChatGPT 摘要
+输出 docs/daily/YYYY-MM-DD.md（含 Jekyll 头），供 GitHub Pages 渲染
 """
 
-import os, datetime, pathlib, textwrap, html
+import os, datetime, pathlib, textwrap, html, random
 import feedparser, markdownify, openai
 
-# ────────────── 配置 ──────────────
+# ────────────────── 配置 ──────────────────
 TWITTER_USERS = [
     "lansao13",
     "435hz",
@@ -16,8 +16,28 @@ TWITTER_USERS = [
     "sama",
     "NewsCaixin",
 ]
-ITEMS_PER_USER = 10               # 每人抓多少条
+ITEMS_PER_USER = 10
 MODEL = "gpt-3.5-turbo"
+
+# 可用 Nitter 节点池（http 优先，避免 SSL）——可随时增删
+NITTER_NODES = [
+    "http://nitter.net",
+    "http://nitter.hu",
+    "http://nitter.cz",
+    "http://nitter.pufe.org",
+    "http://nitter.nohost.me",
+    "http://nitter.poast.org",
+    "http://nitter.hostux.net",
+    "http://nitter.moomer.party",
+    "http://nitter.it",
+    "http://nitter.weiler.rocks",
+    "http://nitter.mha.fi",
+    "http://nitter.esmailelbob.xyz",
+    "http://nitter.lacontrevoie.fr",
+    "http://nitter.kavin.rocks",
+    "http://nitter.unixfox.eu",
+]
+random.shuffle(NITTER_NODES)  # 每次随机顺序尝试
 OUT_DIR = pathlib.Path("docs") / "daily"
 
 PROMPT_TMPL = textwrap.dedent("""
@@ -26,12 +46,22 @@ PROMPT_TMPL = textwrap.dedent("""
 {tweet}
 === 原文结束 ===
 """)
-# ────────────────────────────────
+# ────────────────────────────────────────
 
 
-def build_rss_url(username: str) -> str:
-    """TwitRSS URL"""
-    return f"https://twitrss.me/twitter_user_to_rss/?user={username}"
+def fetch_feed(username: str):
+    """轮询节点，返回首个成功解析且有 entry 的 feedparser Feed，或 None"""
+    for base in NITTER_NODES:
+        rss_url = f"{base.rstrip('/')}/{username}/rss"
+        feed = feedparser.parse(rss_url, agent="Mozilla/5.0")
+        if feed.bozo:
+            continue  # 网络错误 / 解析失败
+        if feed.entries:
+            print(f"[node] {rss_url} -> {len(feed.entries)} entries ✔")
+            return feed
+        else:
+            print(f"[node] {rss_url} -> 0 entries")
+    return None
 
 
 def summarize(text: str) -> str:
@@ -49,7 +79,7 @@ def main():
     today = datetime.date.today()
     outfile = OUT_DIR / f"{today}.md"
     outfile.parent.mkdir(parents=True, exist_ok=True)
-    outfile.unlink(missing_ok=True)   # 覆盖旧文件
+    outfile.unlink(missing_ok=True)
 
     with outfile.open("w", encoding="utf-8") as f:
         # Jekyll 头
@@ -62,16 +92,13 @@ def main():
         f.write(f"# {today} AI / Tech 推文摘要\n\n")
 
         for user in TWITTER_USERS:
-            url = build_rss_url(user)
-            feed = feedparser.parse(url)
-            print(f"{user} -> {len(feed.entries)} entries")
-
-            if not feed.entries:
+            feed = fetch_feed(user)
+            if not feed:
+                print(f"[warn] {user} 全部节点失败")
                 continue
 
             for entry in feed.entries[:ITEMS_PER_USER]:
-                # TwitRSS 把正文放在 description
-                raw = markdownify.markdownify(html.unescape(entry.description))
+                raw = markdownify.markdownify(html.unescape(entry.summary))
                 digest = summarize(raw)
 
                 f.write('<div class="card">\n')
