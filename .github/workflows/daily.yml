@@ -2,7 +2,7 @@ name: Daily Tweet Digest
 
 on:
   schedule:
-    - cron:  '0 0 * * *'          # 每日 08:00 (UTC+8)
+    - cron: '0 0 * * *'          # 每日 08:00 (UTC+8)
   workflow_dispatch:
 
 permissions:
@@ -13,22 +13,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    # 1️⃣ 拉代码
     - uses: actions/checkout@v4
 
+    # 2️⃣ 安装 Python
     - uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
+    # 3️⃣ 安装依赖（snscrape + openai 等）
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install feedparser markdownify openai
+        pip install snscrape[twitter] markdownify openai
 
+    # 4️⃣ 运行脚本
     - name: Generate digest
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: python fetch_and_summarize.py
 
+    # 5️⃣ 提交结果
     - name: Commit & push
       run: |
         git config --global user.email "action@github.com"
