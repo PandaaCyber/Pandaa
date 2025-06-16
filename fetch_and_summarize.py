@@ -8,7 +8,7 @@
 import os, datetime, pathlib, textwrap, subprocess, json, html
 import markdownify, openai
 
-# ── 配置 ────────────────────────────────────────
+# ── 配置 ──────────────────────────────────────────────
 TWITTER_USERS = [
     "lansao13",
     "435hz",
@@ -16,7 +16,7 @@ TWITTER_USERS = [
     "sama",
     "NewsCaixin",
 ]
-TWEETS_PER_USER = 10                # 每人取多少条
+TWEETS_PER_USER = 10
 MODEL = "gpt-3.5-turbo"
 PROMPT_TMPL = textwrap.dedent("""
 你是一位中文编辑，请用不超过 200 字总结下面这条推文内容，并给出 3 个 #标签：
@@ -25,16 +25,27 @@ PROMPT_TMPL = textwrap.dedent("""
 === 原文结束 ===
 """)
 OUT_DIR = pathlib.Path("docs") / "daily"
-# ───────────────────────────────────────────────
+# ────────────────────────────────────────────────────
 
 
 def scrape_user(username: str, limit: int = 10):
-    """调用 snscrape CLI，返回 tweet 列表（最新 → 旧）"""
-    cmd = ["snscrape", "--jsonl", f"--max-results={limit}", f"twitter-user:{username}"]
+    """
+    调用 snscrape CLI 抓取推文。
+    正确语法示例：
+        snscrape --jsonl --max-results 10 twitter-user sama
+    """
+    cmd = [
+        "snscrape",
+        "--jsonl",
+        "--max-results",
+        str(limit),
+        "twitter-user",
+        username,
+    ]
     print(" ".join(cmd))
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
-        print(f"[warn] snscrape {username} failed: {proc.stderr[:200]}")
+        print(f"[warn] snscrape {username} failed: {proc.stderr.splitlines()[0]}")
         return []
     tweets = [json.loads(line) for line in proc.stdout.splitlines()]
     return tweets
@@ -55,7 +66,7 @@ def main():
     today = datetime.date.today()
     outfile = OUT_DIR / f"{today}.md"
     outfile.parent.mkdir(parents=True, exist_ok=True)
-    outfile.unlink(missing_ok=True)          # 覆盖
+    outfile.unlink(missing_ok=True)  # 覆盖旧文件
 
     with outfile.open("w", encoding="utf-8") as f:
         # Jekyll 头
@@ -65,6 +76,7 @@ def main():
         f.write("layout: post\n")
         f.write("excerpt: 今日热门推文速览\n")
         f.write("---\n\n")
+
         f.write(f"# {today} AI / Tech 推文摘要\n\n")
 
         for user in TWITTER_USERS:
@@ -88,5 +100,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
