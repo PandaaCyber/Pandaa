@@ -16,3 +16,6 @@ defaults:                                  # 给 daily 文件自动加版式
       type: "daily"
     values:
       layout: post
+      include:
+  - assets/css
+
