@@ -1,86 +1,86 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-snscrape(Python API) × ChatGPT
-关闭所有 SSL 校验；即使取不到推文也不会 raise，保底输出 0 tweets。
-结果写入 docs/daily/YYYY-MM-DD.md（含 Jekyll 头）
+snscrape × ChatGPT  -> docs/daily/YYYY-MM-DD.md
+抓取失败只写 0 tweets，脚本绝不崩溃。
 """
 
 import os, ssl, datetime, pathlib, textwrap, html, itertools, logging
 import requests, urllib3, snscrape.modules.twitter as sntwitter
 import markdownify, openai
 
-# ────────────── 用户配置 ──────────────
-TWITTER_USERS = ["lansao13", "435hz", "jefflijun", "sama", "NewsCaixin"]
-TWEETS_PER_USER = 10
-MODEL = "gpt-3.5-turbo"
-OUT_DIR = pathlib.Path("docs") / "daily"
-PROMPT_TMPL = textwrap.dedent("""
+# ───── 用户配置 ─────
+TWITTER_USERS      = ["lansao13", "435hz", "jefflijun", "sama", "NewsCaixin"]
+TWEETS_PER_USER    = 10
+MODEL              = "gpt-3.5-turbo"
+OUT_DIR            = pathlib.Path("docs") / "daily"
+PROMPT_TMPL        = textwrap.dedent("""
 你是一位中文编辑，请用不超过 200 字总结下面这条推文内容，并给出 3 个 #标签：
 === 原文开始 ===
 {tweet}
 === 原文结束 ===
 """)
-# ────────────────────────────────────
-
+# ───────────────────
 
 def _disable_ssl():
-    """关闭 requests / urllib3 / ssl 全链路验证"""
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     ssl._create_default_https_context = ssl._create_unverified_context
-    os.environ.update({"PYTHONHTTPSVERIFY": "0",
-                       "CURL_CA_BUNDLE": "",
-                       "REQUESTS_CA_BUNDLE": ""})
-    # patch requests 全局 verify=False
-    _orig_request = requests.sessions.Session.request
-
-    def _patched(self, *args, **kw):
-        kw.setdefault("verify", False)
-        return _orig_request(self, *args, **kw)
-
+    os.environ.update({"PYTHONHTTPSVERIFY":"0",
+                       "CURL_CA_BUNDLE":"",
+                       "REQUESTS_CA_BUNDLE":""})
+    # patch requests
+    _orig = requests.sessions.Session.request
+    def _patched(self,*a,**kw):
+        kw["verify"]=False
+        return _orig(self,*a,**kw)
     requests.sessions.Session.request = _patched
 
+_disable_ssl()
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
-def _summarize(text: str) -> str:
+def _summarize(text:str)->str:
     openai.api_key = os.getenv("OPENAI_API_KEY")
-    resp = openai.ChatCompletion.create(
+    r = openai.ChatCompletion.create(
         model=MODEL,
-        messages=[{"role": "user", "content": PROMPT_TMPL.format(tweet=text)}],
+        messages=[{"role":"user","content":PROMPT_TMPL.format(tweet=text)}],
         temperature=0.4,
-        max_tokens=300,
-    )
-    return resp.choices[0].message.content.strip()
+        max_tokens=300)
+    return r.choices[0].message.content.strip()
 
-
-def _fetch_tweets(user: str, limit: int):
-    """返回 generator；抓取异常时返回空列表"""
+def _safe_fetch(user:str, limit:int):
+    """返回 list；任何异常 → []"""
     try:
-        scraper = sntwitter.TwitterUserScraper(user)
-        return itertools.islice(scraper.get_items(), limit)
+        scr = sntwitter.TwitterUserScraper(user)
+        gen = itertools.islice(scr.get_items(), limit)
+        tweets = []
+        for _ in range(limit):
+            try:
+                tw = next(gen)
+                tweets.append(tw)
+            except StopIteration:
+                break
+            except Exception as e:
+                logging.warning("iterate %s tweet failed: %s", user, e)
+                break
+        return tweets
     except Exception as e:
-        logging.warning("fetch %s failed: %s", user, e)
+        logging.warning("init scraper %s failed: %s", user, e)
         return []
 
-
 def main():
-    _disable_ssl()
-
     today = datetime.date.today()
     outfile = OUT_DIR / f"{today}.md"
     outfile.parent.mkdir(parents=True, exist_ok=True)
     outfile.unlink(missing_ok=True)
 
     with outfile.open("w", encoding="utf-8") as f:
-        # — Jekyll front‑matter —
         f.write("---\n")
         f.write(f"title: {today} 推文摘要\n")
-        f.write(f"date: {today}\n")
-        f.write("layout: post\n")
-        f.write("excerpt: 今日热门推文速览\n")
-        f.write("---\n\n# " + str(today) + " AI / Tech 推文摘要\n\n")
+        f.write(f"date: {today}\nlayout: post\nexcerpt: 今日热门推文速览\n---\n\n")
+        f.write(f"# {today} AI / Tech 推文摘要\n\n")
 
         for user in TWITTER_USERS:
-            tweets = list(_fetch_tweets(user, TWEETS_PER_USER))
+            tweets = _safe_fetch(user, TWEETS_PER_USER)
             print(f"{user} -> {len(tweets)} tweets")
 
             for tw in tweets:
@@ -93,9 +93,9 @@ def main():
 
     print("[done] 写入", outfile)
 
-
 if __name__ == "__main__":
     main()
+
 
 
 
