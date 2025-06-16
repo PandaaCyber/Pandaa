@@ -1,34 +1,34 @@
 name: Daily Tweet Digest
 
 on:
-  schedule:
-    - cron: '0 0 * * *'          # 每日 08:00 (UTC+8)
+  schedule:  # 每日 08:00 (UTC+8)
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  run:
+  digest:
     runs-on: ubuntu-latest
 
     steps:
     # 1️⃣ 拉代码
     - uses: actions/checkout@v4
 
-    # 2️⃣ 安装 Python
+    # 2️⃣ Python 3.11
     - uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    # 3️⃣ 安装依赖（snscrape + openai 等）
+    # 3️⃣ 安装依赖
     - name: Install dependencies
       run: |
         pip install --upgrade pip
         pip install snscrape[twitter] markdownify openai
 
-    # 4️⃣ 运行脚本
-    - name: Generate digest
+    # 4️⃣ 生成摘要
+    - name: Run script
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: python fetch_and_summarize.py
@@ -39,5 +39,5 @@ jobs:
         git config --global user.email "action@github.com"
         git config --global user.name  "github-action-bot"
         git add -A docs/daily
-        git commit -m "chore: refresh digest $(date -u '+%Y-%m-%d %H:%M')" || echo "nothing to commit"
+        git commit -m "chore: refresh digest $(date -u '+%Y-%m-%d %H:%M')" || echo "no changes"
         git push
