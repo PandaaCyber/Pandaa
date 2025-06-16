@@ -16,8 +16,12 @@ import openai
 
 # ─────────────── 配置区 ───────────────
 RSS_URLS = [
-    "https://nitter.net/elonmusk/rss",     # 换成你自己的 Nitter / rsshub 源
-    # "https://rsshub.app/twitter/user/ai_alignment",
+    # 追加关注的 X（Twitter）博主
+"https://nitter.net/lansao13/rss",     # lansao13
+"https://nitter.net/435hz/rss",        # 435hz
+"https://nitter.net/jefflijun/rss",    # jefflijun
+"https://nitter.net/sama/rss",         # sama (Sam Altman)
+"https://nitter.net/NewsCaixin/rss",   # NewsCaixin
 ]
 ITEMS_PER_FEED = 30                        # 每个源最多抓 N 条推文
 MODEL = "gpt-3.5-turbo"                    # 免费额度够用，需要更好效果可改 gpt-4o
