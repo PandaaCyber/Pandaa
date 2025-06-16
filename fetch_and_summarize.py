@@ -16,12 +16,13 @@ import openai
 
 # ─────────────── 配置区 ───────────────
 RSS_URLS = [
-    # 建议使用 RSSHub，可靠性更高；如需 Nitter 节点请自行替换域名
-    "https://rsshub.app/twitter/user/lansao13",
-    "https://rsshub.app/twitter/user/435hz",
-    "https://rsshub.app/twitter/user/jefflijun",
-    "https://rsshub.app/twitter/user/sama",
-    "https://rsshub.app/twitter/user/NewsCaixin",
+# -- 把原来的 rsshub.app … 行整体替换成下面 5 行 -----------------
+"https://nitter.cz/lansao13/rss",     # lansao13
+"https://nitter.cz/435hz/rss",        # 435hz
+"https://nitter.cz/jefflijun/rss",    # jefflijun
+"https://nitter.cz/sama/rss",         # sama  (Sam Altman)
+"https://nitter.cz/NewsCaixin/rss",   # NewsCaixin
+# -----------------------------------------------------------------
 ]
 ITEMS_PER_FEED = 30             # 每个源最多抓 N 条推文
 MODEL = "gpt-3.5-turbo"         # 免费额度够用；需更好效果可改 gpt-4o
