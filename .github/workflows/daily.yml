@@ -6,36 +6,30 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write                 # 允许推送回 main 分支
+  contents: write
 
 jobs:
   run:
     runs-on: ubuntu-latest
 
     steps:
-    # 1) 拉代码
     - uses: actions/checkout@v4
 
-    # 2) 安装 Python
     - uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    # 3) 安装依赖 (snscrape 最新版 + 其它包)
-    - name: Install deps
+    # 只需 feedparser/markdownify/openai，snscrape 不再安装
+    - name: Install dependencies
       run: |
         pip install --upgrade pip
         pip install feedparser markdownify openai
-        pip install --no-cache-dir git+https://github.com/JustAnotherArchivist/snscrape.git
 
-    # 4) 运行脚本
     - name: Generate digest
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        PYTHONHTTPSVERIFY: "0"            # 再双保险：全局关闭 SSL 校验
       run: python fetch_and_summarize.py
 
-    # 5) 提交结果
     - name: Commit & push
       run: |
         git config --global user.email "action@github.com"
@@ -43,4 +37,5 @@ jobs:
         git add -A docs/daily
         git commit -m "chore: refresh digest $(date -u '+%Y-%m-%d %H:%M')" || echo "nothing to commit"
         git push
+
 
