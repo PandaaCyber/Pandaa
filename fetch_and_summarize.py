@@ -1,50 +1,46 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-每天抓取指定 RSS → 调用 ChatGPT 摘要 → 生成 docs/daily/YYYY-MM-DD.md
-文件自带 Jekyll 头信息，GitHub Pages 会自动渲染成博客文章。
+免 API 抓推文版：使用 snscrape 直接爬 X.com。
+生成 docs/daily/YYYY-MM-DD.md（含 Jekyll 头），配合 GitHub Pages。
 """
 
-import os
-import datetime
-import pathlib
-import textwrap
+import os, datetime, pathlib, textwrap, subprocess, json, html
+import markdownify, openai
 
-import feedparser
-import markdownify
-import openai
-
-# ─────────────── 配置区 ───────────────
-RSS_URLS = [
-# -- 把原来的 rsshub.app … 行整体替换成下面 5 行 -----------------
-"https://nitter.cz/lansao13/rss",     # lansao13
-"https://nitter.cz/435hz/rss",        # 435hz
-"https://nitter.cz/jefflijun/rss",    # jefflijun
-"https://nitter.cz/sama/rss",         # sama  (Sam Altman)
-"https://nitter.cz/NewsCaixin/rss",   # NewsCaixin
-# -----------------------------------------------------------------
+# ── 配置 ────────────────────────────────────────
+TWITTER_USERS = [
+    "lansao13",
+    "435hz",
+    "jefflijun",
+    "sama",
+    "NewsCaixin",
 ]
-ITEMS_PER_FEED = 30             # 每个源最多抓 N 条推文
-MODEL = "gpt-3.5-turbo"         # 免费额度够用；需更好效果可改 gpt-4o
+TWEETS_PER_USER = 10                # 每人取多少条
+MODEL = "gpt-3.5-turbo"
 PROMPT_TMPL = textwrap.dedent("""
 你是一位中文编辑，请用不超过 200 字总结下面这条推文内容，并给出 3 个 #标签：
 === 原文开始 ===
 {tweet}
 === 原文结束 ===
 """)
-OUTPUT_DIR = pathlib.Path("docs") / "daily"  # Jekyll collection 目录
-# ──────────────────────────────────────
+OUT_DIR = pathlib.Path("docs") / "daily"
+# ───────────────────────────────────────────────
 
 
-def get_outfile() -> pathlib.Path:
-    """返回今天的输出文件路径，确保目录存在"""
-    today_str = datetime.date.today().isoformat()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    return OUTPUT_DIR / f"{today_str}.md"
+def scrape_user(username: str, limit: int = 10):
+    """调用 snscrape CLI，返回 tweet 列表（最新 → 旧）"""
+    cmd = ["snscrape", "--jsonl", f"--max-results={limit}", f"twitter-user:{username}"]
+    print(" ".join(cmd))
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        print(f"[warn] snscrape {username} failed: {proc.stderr[:200]}")
+        return []
+    tweets = [json.loads(line) for line in proc.stdout.splitlines()]
+    return tweets
 
 
 def summarize(text: str) -> str:
-    """调用 OpenAI 生成中文摘要"""
     openai.api_key = os.getenv("OPENAI_API_KEY")
     resp = openai.ChatCompletion.create(
         model=MODEL,
@@ -55,44 +51,42 @@ def summarize(text: str) -> str:
     return resp.choices[0].message.content.strip()
 
 
-def main() -> None:
-    outfile = get_outfile()
+def main():
     today = datetime.date.today()
+    outfile = OUT_DIR / f"{today}.md"
+    outfile.parent.mkdir(parents=True, exist_ok=True)
+    outfile.unlink(missing_ok=True)          # 覆盖
 
     with outfile.open("w", encoding="utf-8") as f:
-        # ── Jekyll 前置头信息 ──
+        # Jekyll 头
         f.write("---\n")
         f.write(f"title: {today} 推文摘要\n")
         f.write(f"date: {today}\n")
         f.write("layout: post\n")
         f.write("excerpt: 今日热门推文速览\n")
         f.write("---\n\n")
-
         f.write(f"# {today} AI / Tech 推文摘要\n\n")
 
-        # 遍历 RSS 源
-        for url in RSS_URLS:
-            print(f"开始抓取 → {url}")                     # ← 前打印
-            feed = feedparser.parse(url)
-            print(f"{url} -> {len(feed.entries)} entries")  # ← 后打印
-
-            if not feed.entries:        # 没抓到就跳过，省 GPT 调用
+        for user in TWITTER_USERS:
+            tweets = scrape_user(user, TWEETS_PER_USER)
+            print(f"{user} -> {len(tweets)} tweets")
+            if not tweets:
                 continue
 
-            for entry in feed.entries[:ITEMS_PER_FEED]:
-                raw = markdownify.markdownify(entry.summary)
-                digest = summarize(raw)
+            for tw in tweets:
+                raw_text = html.unescape(tw["content"])
+                digest = summarize(raw_text)
 
-                # 卡片包装，配合自定义 CSS
                 f.write('<div class="card">\n')
-                f.write(f"### {entry.title}\n\n")
+                f.write(f"### @{user} · {tw['date'][:10]}\n\n")
                 f.write(f"{digest}\n\n")
-                f.write(f"[原推文链接]({entry.link})\n")
+                f.write(f"[原推文链接](https://x.com/{user}/status/{tw['id']})\n")
                 f.write("\n</div>\n\n")
 
-    print(f"已生成：{outfile}")  # 直接打印相对路径，避免 relative_to 冲突
+    print(f"[done] 写入 {outfile}")
 
 
 if __name__ == "__main__":
     main()
+
 
