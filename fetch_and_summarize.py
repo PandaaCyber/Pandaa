@@ -10,21 +10,21 @@ import datetime
 import pathlib
 import textwrap
 
-import feedparser          # 在 requirements.txt 中已列出
+import feedparser
 import markdownify
 import openai
 
 # ─────────────── 配置区 ───────────────
 RSS_URLS = [
-    # 追加关注的 X（Twitter）博主
-"https://nitter.net/lansao13/rss",     # lansao13
-"https://nitter.net/435hz/rss",        # 435hz
-"https://nitter.net/jefflijun/rss",    # jefflijun
-"https://nitter.net/sama/rss",         # sama (Sam Altman)
-"https://nitter.net/NewsCaixin/rss",   # NewsCaixin
+    # 建议使用 RSSHub，可靠性更高；如需 Nitter 节点请自行替换域名
+    "https://rsshub.app/twitter/user/lansao13",
+    "https://rsshub.app/twitter/user/435hz",
+    "https://rsshub.app/twitter/user/jefflijun",
+    "https://rsshub.app/twitter/user/sama",
+    "https://rsshub.app/twitter/user/NewsCaixin",
 ]
-ITEMS_PER_FEED = 30                        # 每个源最多抓 N 条推文
-MODEL = "gpt-3.5-turbo"                    # 免费额度够用，需要更好效果可改 gpt-4o
+ITEMS_PER_FEED = 30             # 每个源最多抓 N 条推文
+MODEL = "gpt-3.5-turbo"         # 免费额度够用；需更好效果可改 gpt-4o
 PROMPT_TMPL = textwrap.dedent("""
 你是一位中文编辑，请用不超过 200 字总结下面这条推文内容，并给出 3 个 #标签：
 === 原文开始 ===
@@ -71,7 +71,13 @@ def main() -> None:
 
         # 遍历 RSS 源
         for url in RSS_URLS:
+            print(f"开始抓取 → {url}")                     # ← 前打印
             feed = feedparser.parse(url)
+            print(f"{url} -> {len(feed.entries)} entries")  # ← 后打印
+
+            if not feed.entries:        # 没抓到就跳过，省 GPT 调用
+                continue
+
             for entry in feed.entries[:ITEMS_PER_FEED]:
                 raw = markdownify.markdownify(entry.summary)
                 digest = summarize(raw)
@@ -83,9 +89,9 @@ def main() -> None:
                 f.write(f"[原推文链接]({entry.link})\n")
                 f.write("\n</div>\n\n")
 
-    # 打印相对路径即可，避免 relative_to 冲突
-    print(f"已生成：{outfile}")
+    print(f"已生成：{outfile}")  # 直接打印相对路径，避免 relative_to 冲突
 
 
 if __name__ == "__main__":
     main()
+
